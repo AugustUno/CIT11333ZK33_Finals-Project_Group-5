@@ -1,5 +1,6 @@
 **Updates**
-- Grades Module - CRUD works as intended, Edit via Modal; created Grade.php classes for OOP handling;
+- Grades Module - CRUD works as intended, Edit via Modal; created Grade.php classes for OOP handling
+- Subject Module - CRUD added
 
 **General Instructions:**
 - This is a group project (Grouping is the same for the reporting)
