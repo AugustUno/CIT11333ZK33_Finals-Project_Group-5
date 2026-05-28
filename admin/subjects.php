@@ -1,6 +1,10 @@
 <?php
 require 'auth.php';
+// Make sure to include your class files if your app doesn't use an autoloader:
+// require_once '../classes/BaseModel.php';
+// require_once '../classes/Subjects.php';
 
+// 1. Initialize the Session Seed Data if it doesn't exist
 if (!isset($_SESSION['subjects'])) {
     $_SESSION['subjects'] = [
         ["id" => 1, "code" => "MATH101", "name" => "General Mathematics",    "teacher" => "Mr. Batumbakal",    "units" => 4, "schedule" => "MWF 7:30–8:30"],
@@ -12,30 +16,36 @@ if (!isset($_SESSION['subjects'])) {
     ];
 }
 
+// 2. Instantiate your helper class
+$subjectManager = new Subjects();
 $success_message = '';
 
+// --- EDIT ---
+$edit_subject = null;
+if (isset($_GET['edit'])) {
+    $edit_id = (int)$_GET['edit'];
+    $edit_subject = $subjectManager->findById($edit_id);
+}
+
+// --- DELETE ---
+if (isset($_GET['delete'])) {
+    $id = (int)$_GET['delete'];
+    
+    // Use the class method to delete!
+    if ($subjectManager->delete($id)) {
+        $_SESSION['flash'] = "Subject deleted successfully.";
+    }
+    
+    header("Location: subjects.php");
+    exit;
+}
+
+// --- ADD ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // --- ADD ---
-    $new_code     = strtoupper(trim($_POST['code']));
-    $new_name     = trim($_POST['name']);
-    $new_teacher  = trim($_POST['teacher']);
-    $new_units    = (int) $_POST['units'];
-    $new_schedule = trim($_POST['schedule']);
+    // Pass the entire $_POST array safely into your class method
+    $newSubject = $subjectManager->create($_POST);
 
-    $last_id = count($_SESSION['subjects']) > 0
-               ? max(array_column($_SESSION['subjects'], 'id'))
-               : 0;
-
-    $_SESSION['subjects'][] = [
-        "id"       => $last_id + 1,
-        "code"     => $new_code,
-        "name"     => $new_name,
-        "teacher"  => $new_teacher,
-        "units"    => $new_units,
-        "schedule" => $new_schedule,
-    ];
-
-    $_SESSION['flash'] = "\"$new_name\" has been added to your subjects.";
+    $_SESSION['flash'] = '"' . $newSubject['name'] . '" has been added to your subjects.';
     header('Location: subjects.php');
     exit;
 }
@@ -45,9 +55,10 @@ if (isset($_SESSION['flash'])) {
     unset($_SESSION['flash']);
 }
 
-$subjects       = $_SESSION['subjects'];
-$total_subjects = count($subjects);
-$total_units    = array_sum(array_column($subjects, 'units'));
+// 3. Collect statistics using your class metrics
+$subjects       = $subjectManager->getAll();
+$total_subjects = $subjectManager->count();
+$total_units    = $subjectManager->totalUnits();
 
 $active_page = 'subjects';
 $page_title  = 'Subjects';
