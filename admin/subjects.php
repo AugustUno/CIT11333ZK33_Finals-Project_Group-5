@@ -1,5 +1,6 @@
 <?php
 require 'auth.php';
+require_once '../config.php';
 // Make sure to include your class files if your app doesn't use an autoloader:
 // require_once '../classes/BaseModel.php';
 // require_once '../classes/Subjects.php';
@@ -17,7 +18,7 @@ if (!isset($_SESSION['subjects'])) {
 }
 
 // 2. Instantiate your helper class
-$subjectManager = new Subjects();
+$subjectManager = new Subjects($conn);
 $success_message = '';
 
 // --- EDIT ---

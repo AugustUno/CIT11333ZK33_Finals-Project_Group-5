@@ -1,6 +1,6 @@
 <?php
 // ============================================================
-//  header.php
+//header.php
 //
 //  Each page must define BEFORE including this file:
 //    $active_page  — 'profile' | 'subjects' | 'grades'
