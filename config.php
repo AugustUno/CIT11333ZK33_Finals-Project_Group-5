@@ -14,7 +14,7 @@ $config = [
     'host'     => 'localhost',
     'dbname'   => 'students_db',
     'username' => 'root',
-    'password' => 'root',          // XAMPP default is empty
+    'password' => '',               // XAMPP default is empty
 ];
 
 // ----------------------------------------------------------
