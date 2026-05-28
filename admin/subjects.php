@@ -1,38 +1,23 @@
 <?php
 require 'auth.php';
-// Make sure to include your class files if your app doesn't use an autoloader:
-// require_once '../classes/BaseModel.php';
-// require_once '../classes/Subjects.php';
+require_once '../config.php';
 
-// 1. Initialize the Session Seed Data if it doesn't exist
-if (!isset($_SESSION['subjects'])) {
-    $_SESSION['subjects'] = [
-        ["id" => 1, "code" => "MATH101", "name" => "General Mathematics",    "teacher" => "Mr. Batumbakal",    "units" => 4, "schedule" => "MWF 7:30–8:30"],
-        ["id" => 2, "code" => "ENG101",  "name" => "Oral Communication",     "teacher" => "Ms. Flores",        "units" => 2, "schedule" => "TTH 9:00–10:00"],
-        ["id" => 3, "code" => "SCI101",  "name" => "Earth and Life Science", "teacher" => "Ms. Lim",           "units" => 4, "schedule" => "MWF 10:00–11:00"],
-        ["id" => 4, "code" => "FIL101",  "name" => "Komunikasyon",           "teacher" => "Mr. Ramos",         "units" => 2, "schedule" => "TTH 1:00–2:00"],
-        ["id" => 5, "code" => "PE101",   "name" => "Physical Education",     "teacher" => "Coach Delos Reyes", "units" => 2, "schedule" => "WF 2:00–3:00"],
-        ["id" => 6, "code" => "HIST101", "name" => "Philippine History",     "teacher" => "Ms. Bautista",      "units" => 3, "schedule" => "MWF 1:00–2:00"],
-    ];
-}
-
-// 2. Instantiate your helper class
-$subjectManager = new Subjects();
+$subjectManager = new Subjects($conn);
+$userId = (int) $logged_in_user['id'];
 $success_message = '';
 
 // --- EDIT ---
 $edit_subject = null;
 if (isset($_GET['edit'])) {
     $edit_id = (int)$_GET['edit'];
-    $edit_subject = $subjectManager->findById($edit_id);
+    $edit_subject = $subjectManager->findByIdAndUserId($edit_id, $userId);
 }
 
 // --- DELETE ---
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
     
-    // Use the class method to delete!
-    if ($subjectManager->delete($id)) {
+    if ($subjectManager->deleteForUser($id, $userId)) {
         $_SESSION['flash'] = "Subject deleted successfully.";
     }
     
@@ -40,12 +25,29 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// --- ADD ---
+// --- ADD / UPDATE ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Pass the entire $_POST array safely into your class method
-    $newSubject = $subjectManager->create($_POST);
+    $action = $_POST['action'] ?? 'create';
 
-    $_SESSION['flash'] = '"' . $newSubject['name'] . '" has been added to your subjects.';
+    if ($action === 'update') {
+        $edit_id = (int) ($_POST['subject_id'] ?? 0);
+        $updatedSubject = $subjectManager->updateForUser($edit_id, $userId, $_POST);
+
+        $_SESSION['flash'] = $updatedSubject
+            ? '"' . $updatedSubject['name'] . '" has been updated.'
+            : 'Unable to update that subject.';
+
+        header('Location: subjects.php');
+        exit;
+    }
+
+    $payload = $_POST;
+    $payload['user_id'] = $userId;
+    $newSubject = $subjectManager->create($payload);
+
+    $_SESSION['flash'] = $newSubject
+        ? '"' . $newSubject['name'] . '" has been added to your subjects.'
+        : 'Unable to add that subject.';
     header('Location: subjects.php');
     exit;
 }
@@ -56,9 +58,9 @@ if (isset($_SESSION['flash'])) {
 }
 
 // 3. Collect statistics using your class metrics
-$subjects       = $subjectManager->getAll();
-$total_subjects = $subjectManager->count();
-$total_units    = $subjectManager->totalUnits();
+$subjects       = $subjectManager->getByUserId($userId);
+$total_subjects = $subjectManager->count($userId);
+$total_units    = $subjectManager->totalUnits($userId);
 
 $active_page = 'subjects';
 $page_title  = 'Subjects';
@@ -133,6 +135,7 @@ include 'header.php';
                     <th>Teacher</th>
                     <th>Units</th>
                     <th>Schedule</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -152,11 +155,84 @@ include 'header.php';
                     <td><?= htmlspecialchars($subject['teacher']) ?></td>
                     <td class="id-cell"><?= $subject['units'] ?> units</td>
                     <td class="schedule-tag"><?= htmlspecialchars($subject['schedule']) ?></td>
+                    <td class="action-cell">
+                        <a href="subjects.php?edit=<?= $subject['id'] ?>" class="btn-submit" style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; text-decoration:none; padding:8px 12px;"><i class="bi bi-pencil"></i></a>
+                        <a href="subjects.php?delete=<?= $subject['id'] ?>" class="btn-submit" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none; padding:8px 12px; background:#8b2d2d;"><i class="bi bi-trash"></i></a>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
     </div>
+
+    <?php if ($edit_subject): ?>
+    <div class="modal-backdrop" id="subject-edit-modal" aria-hidden="false">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-subject-title">
+            <div class="modal-header">
+                <div class="modal-title" id="edit-subject-title">Edit Subject</div>
+                <a href="subjects.php" class="modal-close" aria-label="Close edit modal"><i class="bi bi-x-lg"></i></a>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="subject_id" value="<?= htmlspecialchars($edit_subject['id']) ?>">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit-code">Subject Code</label>
+                            <input type="text" id="edit-code" name="code" placeholder="e.g. MATH102" required maxlength="10" value="<?= htmlspecialchars($edit_subject['code']) ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-name">Subject Name</label>
+                            <input type="text" id="edit-name" name="name" placeholder="e.g. Statistics and Probability" required value="<?= htmlspecialchars($edit_subject['name']) ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-teacher">Teacher</label>
+                            <input type="text" id="edit-teacher" name="teacher" placeholder="e.g. Ms. Cruz" required value="<?= htmlspecialchars($edit_subject['teacher']) ?>">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-units">Units</label>
+                            <select id="edit-units" name="units" required>
+                                <option value="">— Select —</option>
+                                <option value="1" <?= (int) $edit_subject['units'] === 1 ? 'selected' : '' ?>>1 unit</option>
+                                <option value="2" <?= (int) $edit_subject['units'] === 2 ? 'selected' : '' ?>>2 units</option>
+                                <option value="3" <?= (int) $edit_subject['units'] === 3 ? 'selected' : '' ?>>3 units</option>
+                                <option value="4" <?= (int) $edit_subject['units'] === 4 ? 'selected' : '' ?>>4 units</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label for="edit-schedule">Schedule</label>
+                            <input type="text" id="edit-schedule" name="schedule" placeholder="e.g. MWF 7:30–8:30" required value="<?= htmlspecialchars($edit_subject['schedule']) ?>">
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <a href="subjects.php" class="btn-submit btn-secondary" style="display:inline-flex; align-items:center; justify-content:center; text-decoration:none;">Cancel</a>
+                        <button type="submit" class="btn-submit"><i class="bi bi-pencil-square"></i> Update Subject</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <script>
+    (() => {
+        const modal = document.getElementById('subject-edit-modal');
+        if (!modal) return;
+        document.body.classList.add('modal-open');
+
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal) {
+                window.location.href = 'subjects.php';
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                window.location.href = 'subjects.php';
+            }
+        });
+    })();
+    </script>
 </main>
 <?php include 'footer.php'; ?>
 

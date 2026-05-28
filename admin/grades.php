@@ -179,7 +179,7 @@ include 'header.php';
                         <?= $fg >= 75 ? 'Passed' : 'Failed' ?>
                     </span>
                 </td>
-                <td class="action-cell">
+                <td class="action-cell" style="display:flex; align-items:center; justify-content:center; gap:6px;">
                     <a href="grades.php?edit=<?= $g['id'] ?>" class="btn-submit" style="display:inline-flex; align-items:center; justify-content:center; margin-right:8px; text-decoration:none; padding:8px 12px;"><i class="bi bi-pencil"></i></a>
                     <form method="POST" action="" style="display:inline;">
                         <input type="hidden" name="action" value="delete">

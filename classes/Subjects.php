@@ -7,81 +7,110 @@ class Subjects extends BaseModel
 {
     protected $table = 'subjects';
 
-    // Get all subjects
-    public function getAll()
+    public function getAll($userId = null)
     {
-        return $_SESSION['subjects'] ?? [];
-    }
-
-    // Get subject by ID
-    public function findById($id)
-    {
-        $subjects = $this->getAll();
-        foreach ($subjects as $subject) {
-            if ($subject['id'] == $id) {
-                return $subject;
-            }
+        if ($userId === null) {
+            return parent::getAll();
         }
-        return null;
+
+        return $this->getByUserId($userId);
     }
 
-    // Create / Add new subject
+    public function getByUserId($userId)
+    {
+        return $this->db
+                    ->table($this->table)
+                    ->select()
+                    ->where('user_id', $userId)
+                    ->orderBy('id', 'ASC')
+                    ->get();
+    }
+
+    public function findById($id, $userId = null)
+    {
+        if ($userId === null) {
+            return parent::find($id);
+        }
+
+        return $this->findByIdAndUserId($id, $userId);
+    }
+
+    public function findByIdAndUserId($id, $userId)
+    {
+        return $this->db
+                    ->table($this->table)
+                    ->select()
+                    ->where('id', $id)
+                    ->where('user_id', $userId)
+                    ->first();
+    }
+
     public function create(array $data)
     {
-        if (!isset($_SESSION['subjects'])) {
-            $_SESSION['subjects'] = [];
-        }
-
-        $subjects = $_SESSION['subjects'];
-
-        $last_id = count($subjects) > 0
-            ? max(array_column($subjects, 'id'))
-            : 0;
-
         $newSubject = [
-            "id"       => $last_id + 1,
-            "code"     => strtoupper(trim($data['code'])),
-            "name"     => trim($data['name']),
-            "teacher"  => trim($data['teacher']),
-            "units"    => (int)$data['units'],
-            "schedule" => trim($data['schedule']),
+            'user_id'  => (int) $data['user_id'],
+            'code'     => strtoupper(trim($data['code'])),
+            'name'     => trim($data['name']),
+            'teacher'  => trim($data['teacher']),
+            'units'    => (int) $data['units'],
+            'schedule' => trim($data['schedule']),
         ];
 
-        $_SESSION['subjects'][] = $newSubject;
+        if (!$this->db->table($this->table)->insert($newSubject)) {
+            return false;
+        }
+
+        $newSubject['id'] = (int) $this->db->lastInsertId();
         return $newSubject;
     }
 
-    // Delete subject (FIXED: array_values moved outside loop)
-    public function delete($id)
+    // Update subject by ID
+    public function update($id, array $data)
     {
-        if (!isset($_SESSION['subjects'])) return false;
+        $updatedSubject = [
+            'code'     => strtoupper(trim($data['code'])),
+            'name'     => trim($data['name']),
+            'teacher'  => trim($data['teacher']),
+            'units'    => (int) $data['units'],
+            'schedule' => trim($data['schedule']),
+        ];
 
-        $deleted = false;
-        foreach ($_SESSION['subjects'] as $index => $subject) {
-            if ($subject['id'] == $id) {
-                unset($_SESSION['subjects'][$index]);
-                $deleted = true;
-                break;
-            }
+        if (!$this->db->table($this->table)->update($updatedSubject, $id)) {
+            return false;
         }
 
-        if ($deleted) {
-            $_SESSION['subjects'] = array_values($_SESSION['subjects']);
-            return true;
+        $updatedSubject['id'] = $id;
+        return $updatedSubject;
+    }
+
+    public function updateForUser($id, $userId, array $data)
+    {
+        if (!$this->findByIdAndUserId($id, $userId)) {
+            return false;
         }
 
-        return false;
+        return $this->update($id, $data);
+    }
+
+    // Delete subject
+    public function deleteForUser($id, $userId)
+    {
+        if (!$this->findByIdAndUserId($id, $userId)) {
+            return false;
+        }
+
+        return $this->delete($id);
     }
 
     // Count subjects
-    public function count()
+    public function count($userId = null)
     {
-        return count($this->getAll());
+        return count($this->getAll($userId));
     }
 
     // Total units
-    public function totalUnits()
+    public function totalUnits($userId = null)
     {
-        return array_sum(array_column($this->getAll(), 'units'));
+        return array_sum(array_column($this->getAll($userId), 'units'));
     }
 }
